@@ -4,7 +4,7 @@
 
     Disclaimer: This document is *not* intended for Production use. Best Practices recommended at kubernetes.io and other sites must be charted. Motivated by Kelsey Hightower doc - Kubernetes The Hard Way
 
-Principal drive for crafting this manuscript is for my reference. I created multiple Kubernetes Clusters using contrasting hardware. The document attested very beneficial when setting up OnPrem Kubernetes Cluster at work. I hope you will find it worthwhile.
+Principal drive for crafting this manuscript is for my reference. I created multiple Kubernetes Clusters using contrasting hardware. The document proved very beneficial when setting up OnPrem Kubernetes Cluster at work. I hope you will find it worthwhile.
 
 ## Install kubectl
 
