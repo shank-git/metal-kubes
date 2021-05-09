@@ -4,7 +4,9 @@
 
     Disclaimer: This document is *not* intended for Production use. Best Practices recommended at kubernetes.io and other sites must be charted. Motivated by Kelsey Hightower doc - Kubernetes The Hard Way
 
-Principal drive for crafting this manuscript is for my reference. I created multiple Kubernetes Clusters using contrasting hardware. The document attested very beneficial when setting up OnPrem Kubernetes Cluster at work. I hope you will find it worthwhile.
+Principal drive for crafting this manuscript is for my reference. I created multiple Kubernetes Clusters using contrasting hardware. The document proved very beneficial when setting up OnPrem Kubernetes Cluster at work. I hope you will find it worthwhile.
+
+OnPrem Kubernetes setup creates its own challenges compared to Cloud based setup (EKS / GKE / Azure). Some of these challenges, which I will cover in further posts, were setting up ELB (covered here), setting up Persistent Volume (I used first NFS, then Rook/Ceph), using Private Docker registry with or without TLS enabled (containerd, required in 1.20.2, is not very friendly with Private Docker), locking Kubernetes secrets in a vault like Hashicorp vault.
 
 ## Install kubectl
 
@@ -13,24 +15,24 @@ Its a go binary available for all platforms.
 
 Source Code: https://github.com/kubernetes/kubernetes/tree/master/pkg/kubectl
 
-    wget -qc https://storage.googleapis.com/kubernetes-release/release/v1.20.2/bin/linux/amd64/kubectl
-
-    chmod 755 kubectl
-
-    sudo mv kubectl /usr/local/bin/ 
+```console
+$ wget -qc https://storage.googleapis.com/kubernetes-release/release/v1.20.2/bin/linux/amd64/kubectl
+$ chmod 755 kubectl
+$ sudo mv kubectl /usr/local/bin/ 
+```
 
 (or ~/bin - where ~/bin folder present in your $PATH)
 
 Verify kubectl version 1.20.2 or higher is installed:
 
-    kubectl version --client
-
 ```console
+$ kubectl version --client
 Client Version: version.Info{Major:"1", Minor:"20", GitVersion:"v1.20.2", GitCommit:"faecb196815e248d3ecfb03c680a4507229c2a56", GitTreeState:"clean", BuildDate:"2021-01-13T13:28:09Z", GoVersion:"go1.15.5", Compiler:"gc", Platform:"linux/amd64"}
 ```
 
 Windows:
 ```console
+$ kubectl version --client
 Client Version: version.Info{Major:"1", Minor:"20", GitVersion:"v1.20.2", GitCommit:"faecb196815e248d3ecfb03c680a4507229c2a56", GitTreeState:"clean", BuildDate:"2021-01-13T13:28:09Z", GoVersion:"go1.15.5", Compiler:"gc", Platform:"windows/amd64"}
 ```
 
@@ -386,8 +388,7 @@ $ make
 ```
 > Since this is OnPrem ELB, we will use DaemonSet to deploy pods on all worker nodes, including new ones, for load balancing.
 
-nginx.conf
-----------
+##### nginx.conf
 
 ```console
 
@@ -442,7 +443,7 @@ stream{
 > You will be needing its IP Address as to generate the Kubernetes API Server certificate and private key.
 > In my case it is the IP Address of my External Load Balancer - KUBERNETES_PUBLIC_ADDRESS=10.244.10.156
 
-> You may TLS termination by adding certs & config
+> You may add TLS termination by adding certs & config as,
 ```console
     # Use cfssl from CloudFlare to create ca.pem & ca-key.pem
     ssl_certificate /etc/ssl/certs/web-server.pem;
@@ -453,7 +454,7 @@ stream{
     ssl_dhparam /etc/nginx/certs/dhparam.pem;
 ```
 
-##### The Controller Manager Client Certificate
+### The Controller Manager Client Certificate
 
 Generate the kube-controller-manager client certificate and private key:
 
