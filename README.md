@@ -4,7 +4,7 @@
 
     Disclaimer: This document is *not* intended for Production use. Best Practices recommended at kubernetes.io and other sites must be charted. Motivated by Kelsey Hightower doc - Kubernetes The Hard Way
 
-Principal drive for crafting this manuscript is for my reference. I created multiple Kubernetes Clusters using contrasting hardware. The document proved very beneficial when setting up OnPrem Kubernetes Cluster at work. I hope you will find it worthwhile.
+Principal drive for crafting this manuscript is for my reference. I created multiple Kubernetes Clusters using contrasting hardware. The document attested very beneficial when setting up OnPrem Kubernetes Cluster at work. I hope you will find it worthwhile.
 
 ## Install kubectl
 
@@ -117,6 +117,7 @@ $ ip addr show
     inet6 xxxx::xxxx:xxxx:xxx:xxxx/64 scope link noprefixroute
        valid_lft forever preferred_lft forever
 ```
+> It is important that you maintain same version for all Kubernetes components, in my case I am using 1.20.2
 
 ## Networking
 
@@ -352,6 +353,106 @@ kube-minion-2.pem
 ```
 > openssl x509 -text -noout -in kube-artisan-0.pem (get details of the cert)
 
+## Setup your External Load Balancer, First
+
+Provision the Kubernetes Frontend Load Balancer
+
+I setup Open Source Nginx Load Balancer compiled with flag "--with-stream" 
+
+```console
+ wget -qc https://ftp.pcre.org/pub/pcre/pcre-8.44.tar.gz
+ wget -qc http://zlib.net/zlib-1.2.11.tar.gz
+ wget -qc http://www.openssl.org/source/openssl-1.1.1g.tar.gz
+ wget -qc https://nginx.org/download/nginx-1.19.0.tar.gz
+ gzip -dc zlib-1.2.11.tar.gz |tar -xvf -
+ gzip -dc pcre-8.44.tar.gz |tar -xvf -
+ gzip -dc openssl-1.1.1g.tar.gz |tar -xvf -
+ gzip -dc nginx-1.19.0.tar.gz |tar -xvf -
+
+./configure \
+  --sbin-path=/usr/local/nginx/nginx \
+  --conf-path=/usr/local/nginx/nginx.conf \
+  --pid-path=/usr/local/nginx/nginx.pid \
+  --with-pcre=../pcre-8.44 \
+  --with-zlib=../zlib-1.2.11 \
+  --with-http_ssl_module \
+  --with-stream \
+  --with-mail=dynamic \
+  --add-module=../nginx-rtmp-module
+
+$ sudo  apt install build-essential
+$ make
+
+```
+> Since this is OnPrem ELB, we will use DaemonSet to deploy pods on all worker nodes, including new ones, for load balancing.
+
+nginx.conf
+----------
+
+```console
+
+#user  nobody;
+worker_processes  1;
+
+error_log  logs/error.log;
+error_log  logs/error.log  notice;
+error_log  logs/error.log  info;
+
+#pid        logs/nginx.pid;
+
+events {
+    worker_connections  1024;
+}
+
+stream{
+  upstream stream_backend {
+      server kube-minion-0:8088;
+      server kube-minion-1:8088;
+      server kube-minion-2:8088;
+      server kube-artisan-0:8088;
+      server kube-artisan-1:8088;
+  }
+  server {
+      listen 8080;
+      proxy_pass stream_backend;
+  }
+
+  upstream kubernetes {
+      server kube-maestro-0:6443;
+      server kube-maestro-1:6443;
+      server kube-maestro-2:6443;
+  }
+  server {
+      listen 6443;
+      proxy_pass kubernetes;
+  }
+
+  upstream etcd {
+      server kube-maestro-0:2379;
+      server kube-maestro-1:2379;
+      server kube-maestro-2:2379;
+  }
+  server {
+      listen 2379;
+      proxy_pass etcd;
+  }
+}
+```
+
+> You will be needing its IP Address as to generate the Kubernetes API Server certificate and private key.
+> In my case it is the IP Address of my External Load Balancer - KUBERNETES_PUBLIC_ADDRESS=10.244.10.156
+
+> You may TLS termination by adding certs & config
+```console
+    # Use cfssl from CloudFlare to create ca.pem & ca-key.pem
+    ssl_certificate /etc/ssl/certs/web-server.pem;
+    ssl_certificate_key /etc/ssl/certs/web-server-key.pem;
+    # https://github.com/certbot/certbot/blob/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf
+    include /etc/nginx/certs/options-ssl-nginx.conf;
+    # sudo openssl dhparam 2048 -out /etc/nginx/certs/dhparam.pem (-out may not work, cut&paste)
+    ssl_dhparam /etc/nginx/certs/dhparam.pem;
+```
+
 ##### The Controller Manager Client Certificate
 
 Generate the kube-controller-manager client certificate and private key:
@@ -563,77 +664,6 @@ done
 
 > The kube-proxy, kube-controller-manager, kube-scheduler, and kubelet client certificates
 > will be used to generate client authentication configuration files in the next section.
-
-## Setup your External Load Balancer, First
-
-Provision the Kubernetes Frontend Load Balancer
-
-I setup Open Source Nginx Load Balancer compiled with flag "--with-stream" 
-
-```console
- wget -qc https://ftp.pcre.org/pub/pcre/pcre-8.44.tar.gz
- wget -qc http://zlib.net/zlib-1.2.11.tar.gz
- wget -qc http://www.openssl.org/source/openssl-1.1.1g.tar.gz
- wget -qc https://nginx.org/download/nginx-1.19.0.tar.gz
- gzip -dc zlib-1.2.11.tar.gz |tar -xvf -
- gzip -dc pcre-8.44.tar.gz |tar -xvf -
- gzip -dc openssl-1.1.1g.tar.gz |tar -xvf -
- gzip -dc nginx-1.19.0.tar.gz |tar -xvf -
-
-./configure \
-  --sbin-path=/usr/local/nginx/nginx \
-  --conf-path=/usr/local/nginx/nginx.conf \
-  --pid-path=/usr/local/nginx/nginx.pid \
-  --with-pcre=../pcre-8.44 \
-  --with-zlib=../zlib-1.2.11 \
-  --with-http_ssl_module \
-  --with-stream \
-  --with-mail=dynamic \
-  --add-module=../nginx-rtmp-module
-```
-
-nginx.conf
-----------
-
-```console
-#user  nobody;
-worker_processes  1;
-
-error_log  logs/error.log;
-error_log  logs/error.log  notice;
-error_log  logs/error.log  info;
-
-#pid        logs/nginx.pid;
-
-events {
-    worker_connections  1024;
-}
-
-stream{
-  upstream kubernetes {
-      server kube-maestro-0:6443;
-      server kube-maestro-1:6443;
-      server kube-maestro-2:6443;
-  }
-  server {
-      listen 6443;
-      proxy_pass kubernetes;
-  }
-
-  upstream etcd {
-      server kube-maestro-0:2379;
-      server kube-maestro-1:2379;
-      server kube-maestro-2:2379;
-  }
-  server {
-      listen 2379;
-      proxy_pass etcd;
-  }
-}
-```
-
-> You will be needing its IP Address as to generate the Kubernetes API Server certificate and private key.
-> In my case it is the IP Address of my External Load Balancer - KUBERNETES_PUBLIC_ADDRESS=10.244.10.156
 
 ## Generating Kubernetes Configuration Files for Authentication
 
@@ -1149,9 +1179,9 @@ Start the Controller Services
 
 > Allow up to 10 seconds for the Kubernetes API Server to fully initialize.
 
-Enable HTTP Health Checks
+### Enable HTTP Health Checks
 
-An External Load Balancer will be used to distribute traffic across the three API servers
+External Load Balancer created above will be used to distribute traffic across the three API servers
 and allow each API server to terminate TLS connections and validate client certificates.
 The network load balancer only supports HTTP health checks which means the HTTPS endpoint exposed by the API server cannot be used.
 As a workaround the nginx webserver can be used to proxy HTTP health checks.
@@ -1217,9 +1247,8 @@ X-Kubernetes-Pf-Flowschema-Uid: 5c1cad28-d0bc-4b40-8208-eb354f102441
 X-Kubernetes-Pf-Prioritylevel-Uid: c6aefb90-728b-4b2b-9209-aafe63d9a931
 ```
 
-    Remember to run the above commands on each controller node: kube-maestro-0, kube-maestro-1, kube-maestro-2.
+> Remember to run the above commands on each controller node: kube-maestro-0, kube-maestro-1, kube-maestro-2.
 
-> It is important that you maintain same version for all Kubernetes components, in my case I am using 1.20.2
 ## RBAC for Kubelet Authorization
 
 In this section you will configure RBAC permissions to allow the Kubernetes API Server to access the Kubelet API on each worker node.
