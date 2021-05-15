@@ -9,6 +9,7 @@ Principal drive for crafting this manuscript is for my reference. I created mult
 OnPrem Kubernetes setup creates its own challenges compared to Cloud based setup (EKS / GKE / Azure). Some of these challenges, which I will cover in further posts, were setting up ELB (covered here), setting up Persistent Volume (I used first NFS, then Rook/Ceph), using Private Docker registry with or without TLS enabled (containerd, required in 1.20.2, is not very friendly with Private Docker), locking Kubernetes secrets in a vault like Hashicorp vault.
 
 ![image](https://user-images.githubusercontent.com/83885653/118353725-7b766300-b51c-11eb-8ab0-32b699e5a074.png)
+
 Credit: https://kubernetes.github.io/ingress-nginx/deploy/baremetal/
 
 ## Install kubectl
