@@ -76,8 +76,8 @@ You may even have etcd server on your control nodes.
 Kubernetes requires a set of machines to host the Kubernetes control plane and the worker nodes where containers are ultimately run. 
 In this section you will provision the compute resources required for running a secure and highly available Kubernetes cluster.
 
-We will create bridge network on each host machine, and make sure each VM gets its IP Address from your Router, this will insure flat networking. 
-You will need to assign static IP Address to your nodes (using MAC Address on your Router should ensure that)
+We will create bridge network on each host machine, and make sure each VM gets its IP Address from your DHCP server, this will insure flat networking. 
+You will need to assign static IP Address to your nodes (using MAC Address on your DHCP server should ensure that)
 
 Use virt-manager on host machine (ArchLinux/Ubuntu/Centos/OpenSuse) to create VMs,
 
@@ -128,12 +128,11 @@ In cases where this is not desired network policies can limit how groups of cont
 
 A subnet must be provisioned with an IP address range large enough to assign a private IP address to each node in the Kubernetes cluster.
 
-Firewall Rules (Not needed on premise setup, as all nodes will be open behind your Router - DHCP)
+Firewall Rules (Not needed on premise setup, as all nodes will be open behind your DHCP server)
 
 An external load balancer will be used to expose the Kubernetes API Servers to remote clients, covered later.
 
-Kubernetes Public IP Address
-Using MAC Address, assign a static IP address that will be attached to the external load balancer fronting the Kubernetes API Servers:
+> Kubernetes Public IP Address: Using MAC Address, assign a static IP address that will be attached to the external load balancer fronting the Kubernetes API Servers.
 
 ### Compute Nodes
 
@@ -144,7 +143,13 @@ Each compute node will be provisioned with a static IP address to simplify the K
 
 Create 3 compute nodes which will host the Kubernetes control plane:
 
-#### Kubernetes Workers
+```console
+10.244.10.153 kube-maestro-0
+10.244.10.154 kube-maestro-1
+10.244.10.155 kube-maestro-2
+```
+
+### Kubernetes Workers
 
 Each worker node requires a pod subnet allocation from the Kubernetes cluster CIDR (*cider*) range.
 The pod subnet allocation will be used to configure container networking in a later exercise. 
@@ -153,9 +158,9 @@ The pod-cidr node metadata will be used to expose pod subnet allocations to comp
 The Kubernetes cluster CIDR range is defined by the Controller Manager's --cluster-cidr flag. 
 In this tutorial the cluster CIDR range will be set to 10.100.0.0/16, which supports 254 subnets.
 
-Create 6 compute nodes which will host the Kubernetes worker nodes (you can add Worker nodes at anytime, as showwn later):
+Create 6 compute nodes which will host the Kubernetes worker nodes (you can add Worker nodes at anytime, as shown later).
 
-List the compute nodes (this should go to /etc/hosts of your auxiliary machine):
+List all the nodes (this should go to /etc/hosts of your Auxiliary machine):
 
 ```console
 10.244.10.156 kube-lb
@@ -1520,6 +1525,7 @@ EOF
 ```
 
 The resolvConf configuration is used to avoid loops when using CoreDNS for service discovery on systems running systemd-resolved.
+> https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/#known-issues
 
 Create the kubelet.service systemd unit file:
 
